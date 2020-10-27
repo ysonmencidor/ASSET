@@ -1,0 +1,269 @@
+﻿@page "/Testing"
+@using NTBIAsset.Shared
+@using System.Text.Json;
+@inject HttpClient http
+@inject IJSRuntime JSRuntime
+@inject IMatToaster Toaster
+<h3>Asset</h3>
+
+<MatButton Outlined="true" @onclick="@(e=>OpenDialog(false))">Add Item</MatButton>
+<hr />
+
+
+<MatTable Items="@Stocks" class="mat-elevation-z5"
+          AllowSelection="true"
+          SelectionChanged="SelectionChangeEvent"
+          FilterByColumnName="Fixed_Asset_Name">
+    <MatTableHeader>
+        <th>AssetCode</th>
+        <th>Cost</th>
+        <th>Barcode</th>
+        <th>Action</th>
+    </MatTableHeader>
+    <MatTableRow>
+        <td>@context.Fixed_Asset_Code</td>
+        <td>@String.Format("${0:f2}", @context.Cost)</td>
+        <td>@context.BarCode</td>
+        <td>
+            <MatButton Raised="true" @onclick="@(e=>OpenDialog(true))" Icon="edit" title="Edit"></MatButton>
+            <MatButton Raised="true" @onclick="async ()=> await DeleteStock(context)" Icon="restore_from_trash" title="Delete"></MatButton>
+        </td>
+    </MatTableRow>
+</MatTable>
+
+
+
+<MatDialog @bind-IsOpen="@dialogIsOpen">
+    <MatDialogTitle>Add / Edit Item</MatDialogTitle>
+    @if (Stock == null)
+    {
+        <p>Loading...</p>
+    }
+    else
+    {
+        <EditForm Model="Stock" OnValidSubmit="OkClick">
+        <MatDialogContent>
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="mat-layout-grid">
+                <div class="mat-layout-grid-inner">
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-3">
+                        <MatTextField Label="Asset Code" @bind-Value="Stock.Fixed_Asset_Code"></MatTextField>
+                    </div>
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-3">
+                        <MatTextField Label="Name" @bind-Value="Stock.Fixed_Asset_Name"></MatTextField>
+                    </div>
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-3">
+                        @if (locations != null)
+                        {
+                            <MatSelectValue Label="Location" FullWidth="false" @bind-Value="Stock.LocationId" Items="locations" ValueSelector="@(i=>i.Id)">
+                                <ItemTemplate Context="locationSelector">@locationSelector.Name</ItemTemplate>
+                            </MatSelectValue>
+
+                        }
+                    </div>
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-3">
+
+                        <MatTextField Label="Assigned to" @bind-Value="Stock.Assigned"></MatTextField>
+                    </div>
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-3">
+                        <MatTextField Label="Status" @bind-Value="Stock.Status"></MatTextField>
+                    </div>
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-3">
+                        <MatTextField TextArea="true" Label="Specification" @bind-Value="Stock.Specification"></MatTextField>
+                    </div>
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-3">
+                        <MatTextField Label="Serial" @bind-Value="Stock.Serial"></MatTextField>
+                    </div>
+
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-3">
+                        <MatTextField Label="UOM" @bind-Value="Stock.Uom"></MatTextField>
+                    </div>
+
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-3">
+                        <MatTextField Label="PO #" @bind-Value="Stock.PO_Number"></MatTextField>
+                    </div>
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-3">
+                        <MatTextField Label="DR #" @bind-Value="Stock.DR_Number"></MatTextField>
+                    </div>
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-3">
+                        <MatNumericUpDownField DecimalPlaces="2" Minimum="0" Label="Cost" @bind-Value="Stock.Cost"></MatNumericUpDownField>
+                    </div>
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-3">
+                        <MatDatePicker Label="Date Aquired" @bind-Value="Stock.Date_Acquired"></MatDatePicker>
+                    </div>
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
+                        <MatTextField FullWidth="true" Label="Remarks" @bind-Value="Stock.Remarks"></MatTextField>
+                    </div>
+                </div>
+            </div>
+            <MatDialogActions>
+                <MatButton Type="Submit">Save</MatButton>
+                <MatButton Type="Button" OnClick="CloseDialog">Cancel</MatButton>
+            </MatDialogActions>
+        </MatDialogContent>
+    </EditForm>
+    }
+</MatDialog>
+
+
+
+
+@code  {
+
+    public int Val { get; set; }
+
+    List<Stock> Stocks = new List<Stock>();
+
+    Stock Stock = new Stock();
+
+    Stock selectedStock = null;
+    Stock tempStock = null;
+
+    int _index = -1;
+    bool _isDelete = false;
+    bool dialogIsOpen = false;
+    bool _isEdit = false;
+    bool snackBar = false;
+
+    Location[] locations;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        Stocks = await http.GetJsonAsync<List<Stock>>("api/GetActiveStocks");
+
+        List<Location> listOfLocationsss = await http.GetJsonAsync<List<Location>>("api/Locations");
+        locations = new Location[listOfLocationsss.Count + 1];
+
+        var counter = 0;
+        locations[counter] = new Location { Id = 0, Name = "-Select Location-", Active = false };
+        foreach (var item in listOfLocationsss)
+        {
+            counter++;
+            locations[counter] = new Location { Id = item.Id, Name = item.Name, Active = item.Active };
+        }
+    }
+
+
+    private async Task AddStock(Stock stock)
+    {
+
+        var httpResponse = await http.PostAsJsonAsync("api/Stocks", stock);
+        if (httpResponse.IsSuccessStatusCode)
+        {
+            var responseString = await httpResponse.Content.ReadAsStringAsync();
+            var responseData = JsonSerializer.Deserialize<Stock>(responseString,
+                new JsonSerializerOptions() { PropertyNameCaseInsensitive = true });
+            Stocks.Add(stock);
+        }
+
+    }
+    private async Task EditStock(Stock stock)
+    {
+        if (stock != null && stock.Id > 0)
+        {
+            int index = Stocks.FindIndex(a => a.Id == stock.Id);
+            Stocks.RemoveAll(x => x.Id == stock.Id);
+            Stocks.Insert(index, stock);
+
+
+            //await JSRuntime.InvokeVoidAsync("console.log", Stock);
+
+            await http.PutAsJsonAsync("api/Stocks/" + stock.Id, stock);
+
+            Toaster.Add("Update successfully!", MatToastType.Success);
+        }
+    }
+    private async Task DeleteStock(Stock stockToDelete)
+    {
+        _isDelete = true;
+        if (stockToDelete.Id > 0)
+        {
+            #region snackbar
+            _index = Stocks.FindIndex(a => a.Id == stockToDelete.Id);
+
+            //tempStock = new Stock();
+            tempStock = await http.GetJsonAsync<Stock>("api/Stocks/" + stockToDelete.Id);
+            #endregion
+
+            await JSRuntime.InvokeVoidAsync("console.log", tempStock);
+
+            Stocks.Remove(stockToDelete);
+
+            _isDelete = false;
+
+            this.StateHasChanged();
+        }
+    }
+    private void UndoDelete()
+    {
+        if (tempStock != null && _index > 0)
+        {
+            Stocks.Insert(_index, tempStock);
+            tempStock = null;
+        }
+    }
+
+    #region dialogbox
+    private void OpenDialog(bool isEdit)
+    {
+        _isEdit = isEdit;
+        if (!_isEdit)
+        {
+            Stock = new Stock();
+            //Stock.LocationId = 0;
+        }
+        dialogIsOpen = true;
+    }
+    private async Task OkClick() // save Employee
+    {
+        dialogIsOpen = false;
+        if (!_isEdit) await this.AddStock(Stock);
+        else await this.EditStock(Stock);
+    }
+    private void CloseDialog()
+    {
+        dialogIsOpen = false;
+        if (selectedStock != null)
+        {
+            Stock = selectedStock;
+            //await this.EditStock(selectedStock);
+        }
+    }
+    private void SelectionChangeEvent(object obj_Stock)
+    {
+        var currentStock = (Stock)obj_Stock;
+        if (currentStock != null)
+        {
+            Stock = currentStock;
+
+            //await JSRuntime.InvokeVoidAsync("console.log", Stock);
+
+            //            Val = Stock.LocationId;
+
+            selectedStock = new Stock(currentStock.Id,
+                        currentStock.BarCode,
+                        currentStock.LocationId,
+                        currentStock.Fixed_Asset_Code,
+                        currentStock.Fixed_Asset_Name,
+                        currentStock.Specification,
+                        currentStock.Uom,
+                        currentStock.Cost,
+                        currentStock.Serial,
+                        currentStock.PO_Number,
+                        currentStock.DR_Number,
+                        currentStock.Date_Acquired,
+                        currentStock.Assigned,
+                        currentStock.Status,
+                        currentStock.Remarks);
+
+        }
+        else
+        {
+            selectedStock = new Stock();
+        }
+        //if (_isDelete) await this.DeleteStock();
+    }
+    #endregion
+}

@@ -1,0 +1,110 @@
+﻿@layout AccountLayout
+@page "/Login"
+@using Newtonsoft.Json
+@using NTBIAsset.Shared
+@inject HttpClient http
+@inject NavigationManager navigationManager
+@inject AuthenticationStateProvider authProvider
+
+
+<div class="card mt-5">
+    <article class="card-body">
+        <h4 class="card-title mb-4 mt-1">Sign in</h4>
+
+        <EditForm Model="userAccount" OnValidSubmit="@(() => SignIn())" autocomplete="false">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="form-group">
+                <label>Username</label>
+                <InputText class="form-control form-control-sm" @bind-Value="userAccount.Username"></InputText>
+            </div> <!-- form-group// -->
+            <div class="form-group">
+                <!--  <a class="float-right" href="#">Forgot?</a> -->
+                <label>Password</label>
+                <InputText type="password" class="form-control form-control-sm" @bind-Value="userAccount.Password"></InputText>
+            </div> <!-- form-group// -->
+            <div class="form-group">
+                <div class="checkbox">
+                    <label> <input type="checkbox"> Save password </label>
+                </div> <!-- checkbox .// -->
+            </div> <!-- form-group// -->
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary btn-block"> Login  </button>
+            </div> <!-- form-group// -->
+        </EditForm>
+    </article>
+</div> <!-- card.// -->
+
+<br />
+@if (Message != string.Empty)
+{
+    if (OnError)
+    {
+        <label class="alert alert-danger">@Message</label>
+    }
+    else
+    {
+       <label class="alert alert-success">@Message</label>
+    }
+}
+
+@code {
+
+    string Message = string.Empty;
+    UserAccount userAccount = new UserAccount();
+
+    public bool OnError = false;
+
+    [CascadingParameter]
+    public Task<AuthenticationState> authenticationState { get; set; }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await authenticationState;
+        var user = authState.User;
+
+        if (user.Identity.IsAuthenticated)
+        {
+            navigationManager.NavigateTo("/");
+        }
+        else
+        {
+            userAccount = new UserAccount();
+        }
+    }
+
+
+    async Task SignIn()
+    {
+        Message = "Logging in....";
+        OnError = false;
+
+        var Result = await http.PostAsJsonAsync<UserAccount>("api/UserAccounts/loginuser", userAccount);
+
+        if (Result.StatusCode.ToString() == "OK")
+        {
+            var returnedUser = JsonConvert.DeserializeObject<UserAccount>(await Result.Content.ReadAsStringAsync());
+
+            if (returnedUser.Active == false)
+            {
+                OnError = true;
+                Message = "Account is disabled, Please contact Administrator.";
+            }
+            else
+            {
+                await authProvider.GetAuthenticationStateAsync();
+                navigationManager.NavigateTo("/");
+            }
+
+        }
+        else
+        {
+            OnError = true;
+            Message = "Invalid username or Password";
+        }
+    }
+
+
+
+}

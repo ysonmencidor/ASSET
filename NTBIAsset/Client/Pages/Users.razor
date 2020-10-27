@@ -1,0 +1,107 @@
+﻿@page "/Users"
+@using NTBIAsset.Shared;
+@using Microsoft.AspNetCore.SignalR.Client;
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IToastService toastService
+
+<h3>Accounts</h3>
+<hr />
+<div class="container">
+    <div class="row justify-content-start mb-3">
+        <button @onclick="@(() => ShowModalAccount(0))" class="btn btn-primary btn-sm">New User</button>
+    </div>
+</div>
+
+@if (userAccount == null)
+{
+    <p>Loading..</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Active</th>
+                <th>Date Created</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in userAccount)
+            {
+            <tr>
+                <td>@item.Username</td>
+                <td>@item.Active</td>
+                <td>@item.Date_Created</td>
+                <td><button type="button" @onclick="@(() => ShowModalAccount(item.Id))" class="btn btn-info btn-sm"><span class="fa fa-pencil"></span> Edit</button></td>
+            </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+
+    [CascadingParameter] public IModalService Modal { get; set; }
+    private HubConnection hubConnection;
+    List<UserAccount> userAccount = new List<UserAccount>();
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        hubConnection = new HubConnectionBuilder()
+        .WithUrl(NavigationManager.ToAbsoluteUri("/AccountHub"))
+        .Build();
+
+
+        hubConnection.On("ReceiveMessage", async () =>
+        {
+            await LoadData();
+            StateHasChanged();
+        });
+
+        await hubConnection.StartAsync();
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        userAccount = await Http.GetJsonAsync<List<UserAccount>>("api/UserAccounts");
+        StateHasChanged();
+    }
+
+
+    async Task ShowModalAccount(int AccountID)
+    {
+        var parameters = new ModalParameters();
+        parameters.Add(nameof(CreateAccountForm.AccountID), AccountID);
+
+        string title = string.Empty;
+        if (AccountID > 0)
+        {
+            title = "Edit Form";
+        }
+        else
+        {
+            title = "Adding Form";
+        }
+
+        var formModal = Modal.Show<CreateAccountForm>(title, parameters);
+        var result = await formModal.Result;
+
+
+        if (!result.Cancelled)
+        {
+            toastService.ShowSuccess(result.Data.ToString());
+        }
+
+        if (IsConnected) await SendMessage();
+
+    }
+
+    public bool IsConnected => hubConnection.State == HubConnectionState.Connected;
+
+    Task SendMessage() => hubConnection.SendAsync("SendMessage");
+}

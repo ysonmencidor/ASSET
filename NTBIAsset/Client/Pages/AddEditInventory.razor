@@ -1,0 +1,184 @@
+﻿
+@using NTBIAsset.Shared
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<div class="container">
+    @if (stock == null)
+    {
+        <p>Loading..</p>
+    }
+    else
+    {
+        <EditForm Model="stock" OnValidSubmit="@Save">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="row">
+                <div class="col-12 col-lg-3 col-md-3 col-sm-6">
+                    <div class="form-group">
+                        <label class="control-label">Asset Code</label>
+                        <InputText class="form-control form-control-sm" autofocus @bind-Value="stock.Fixed_Asset_Code"></InputText>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-3 col-md-3 col-sm-6">
+                    <div class="form-group">
+                        <label class="control-label">Name</label>
+                        <InputText class="form-control form-control-sm" @bind-Value="stock.Fixed_Asset_Name"></InputText>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-3 col-md-3 col-sm-6">
+                    <div class="form-group">
+                        <label class="control-label">Location</label>
+                        <CustomInputSelect class="form-control form-control-sm" @bind-Value="stock.LocationId">
+                            <option value="-1">-Select Location-</option>
+                            @if (locations != null)
+                                {
+                                @foreach (var loc in locations)
+                                    {
+                                    <option value="@loc.Id">@loc.Name</option>
+
+                                    }
+                                }
+                        </CustomInputSelect>
+                        <ValidationMessage For="() => stock.LocationId" />
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-3 col-md-3 col-sm-6">
+                    <div class="form-group">
+                        <label class="control-label">Assigned to</label>
+                        <InputText class="form-control form-control-sm" @bind-Value="stock.Assigned"></InputText>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-3 col-md-3 col-sm-6">
+                    <div class="form-group">
+                        <label class="control-label">Specs</label>
+                        <InputTextArea class="form-control form-control-sm" @bind-Value="stock.Specification"></InputTextArea>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-3 col-md-3 col-sm-6">
+                    <div class="form-group">
+                        <label class="control-label">Serial</label>
+                        <InputText class="form-control form-control-sm" @bind-Value="stock.Serial"></InputText>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-3 col-md-3 col-sm-6">
+                    <div class="form-group">
+                        <label class="control-label">UOM</label>
+                        <InputText class="form-control form-control-sm" @bind-Value="stock.Uom"></InputText>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-3 col-md-3 col-sm-6">
+                    <div class="form-group">
+                        <label class="control-label">PO #</label>
+                        <InputText class="form-control form-control-sm" @bind-Value="stock.PO_Number"></InputText>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-3 col-md-3 col-sm-6">
+                    <div class="form-group">
+                        <label class="control-label">DR #</label>
+                        <InputText class="form-control form-control-sm" @bind-Value="stock.DR_Number"></InputText>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-3 col-md-3 col-sm-6">
+                    <div class="form-group">
+                        <label class="control-label">Cost</label>
+                        <InputNumber class="form-control form-control-sm" @bind-Value="stock.Cost"></InputNumber>
+                    </div>
+                </div>
+
+
+
+
+
+                <div class="col-12 col-lg-3 col-md-3 col-sm-6">
+                    <div class="form-group">
+                        <label class="control-label">Status</label>
+                        <InputText class="form-control form-control-sm" @bind-Value="stock.Status"></InputText>
+                    </div>
+                </div>
+
+
+                <div class="col-12 col-lg-3 col-md-3 col-sm-6">
+                    <div class="form-group">
+                        <label class="control-label">Date Aquired</label>
+                        <InputDate class="form-control form-control-sm" @bind-Value="stock.Date_Acquired"></InputDate>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-8 col-md-8 col-sm-6">
+                    <div class="form-group">
+                        <label class="control-label">Remarks</label>
+                        <InputTextArea class="form-control form-control-sm" @bind-Value="stock.Remarks"></InputTextArea>
+                    </div>
+                </div>
+                <hr />
+                <div class="col-12 d-flex justify-content-end">
+                    <input type="submit" class="btn btn-success btn-sm" value="Save" />&nbsp;
+                    <input type="submit" class="btn btn-secondary btn-sm" @onclick="@Cancel" value="Cancel" />
+                </div>
+            </div>
+        </EditForm>
+    }
+</div>
+@code {
+
+
+    [CascadingParameter] BlazoredModalInstance BlazoredModal { get; set; }
+
+
+    Stock stock = new Stock();
+
+    [Parameter]
+    public int id { get; set; }
+
+    List<Location> locations = new List<Location>();
+
+
+    protected override async Task OnParametersSetAsync()
+    { 
+        await LoadData();
+    }
+
+    protected async Task LoadData()
+    {
+        if (id > 0)
+        {
+            stock = await Http.GetJsonAsync<Stock>("api/Stocks/" + id);
+            locations = await Http.GetJsonAsync<List<Location>>("api/Locations");
+        }
+        else
+        {
+            locations = await Http.GetJsonAsync<List<Location>>("api/Locations");
+        }
+
+    }
+
+
+
+    private async Task Save()
+    {
+        if (id > 0)
+        {
+            await Http.PutAsJsonAsync("api/Stocks/" + id, stock);
+            await BlazoredModal.Close(ModalResult.Ok($"Record update successfully."));
+        }
+        else
+        {
+            await Http.PostAsJsonAsync("api/Stocks", stock);
+            await BlazoredModal.Close(ModalResult.Ok($"Added new item successfully."));
+        }
+    }
+
+    void Cancel()
+    {
+        BlazoredModal.Cancel();
+    }
+  
+}

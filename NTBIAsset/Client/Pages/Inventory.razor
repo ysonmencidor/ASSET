@@ -1,0 +1,172 @@
+﻿@page "/Inventory"
+
+@using Microsoft.AspNetCore.SignalR.Client;
+@using NTBIAsset.Shared;
+@using System.IO;
+@using System.Text.Json;
+@attribute [Authorize]
+@inject IModalService Modal
+@inject IToastService toastService
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+<h3>Inventory</h3>
+<hr />
+@if (stocks == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+
+
+    <div class="container">
+        <div class="row justify-content-start mb-3">
+            <button class="btn btn-primary btn-sm" @onclick="@(() => ShowModalInvent(0))">New Item</button>
+        </div>
+        <div class="row justify-content-end">
+            <div class="form-inline">
+                <label class="sr-only">Search </label>
+                <input type="text" class="form-control form-control-sm mb-2 mr-sm-2" @bind="filterCode" placeholder="Filter by Asset Code" />
+                <button type="button" @onclick="Filter" class="btn btn-outline-info btn-sm  mb-2 mr-sm-2">Search</button>
+                <button type="button" @onclick="Clear" class="btn btn-outline-secondary btn-sm mb-2 mr-sm-2">Clear</button>
+            </div>
+        </div>
+    </div>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Barcode</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in stocks)
+            {
+                <tr>
+                    <td>@item.Fixed_Asset_Code</td>
+                    <td>@item.Fixed_Asset_Name</td>
+                    <td>@item.BarCode</td>
+                    <td>
+                        <button class="btn btn-info btn-sm" @onclick="@(() => ShowModalInvent(item.Id))">Edit</button>
+                        <a class="btn btn-danger btn-sm" href="/delete-item/@item.Id">Delete</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <Pagination TotalPagesQuantity="totalPageQuantity" CurrentPage="currentPage" Radius="2" SelectedPage="SelectedPage"></Pagination>
+}
+
+@code {
+
+
+    List<Stock> stocks = new List<Stock>();
+    private HubConnection hubConnection;
+    private int totalPageQuantity;
+    private int currentPage = 1;
+    private string filterCode = string.Empty;
+    string Message = string.Empty;
+
+
+    async Task ShowModalInvent(int inventID)
+    {
+        var parameters = new ModalParameters();
+        parameters.Add(nameof(AddEditInventory.id), inventID);
+
+        string title = string.Empty;
+        if (inventID > 0)
+        {
+            title = "Edit Form";
+        }
+        else
+        {
+            title = "Adding Form";
+        }
+
+        var formModal = Modal.Show<AddEditInventory>(title, parameters);
+
+        var result = await formModal.Result;
+
+        if (!result.Cancelled)
+        {
+            toastService.ShowSuccess(result.Data.ToString());
+            if (IsConnected) await SendMessage();
+        }
+        //else
+        //{
+        //    toastService.ShowWarning("Form was Cancelled");
+        //}
+
+    }
+
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/stockHub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On("StockReceiveMessage", () =>
+        {
+            CallLoadData();
+        });
+
+        await hubConnection.StartAsync();
+        await LoadData();
+
+    }
+
+    private void CallLoadData()
+    {
+        Task.Run(async () =>
+        {
+            await LoadData();
+        });
+    }
+
+    protected async Task LoadData(int page = 1, int quantityperpage = 10)
+    {
+        var httpResponse = await Http.GetAsync($"api/Stocks?page={page}&quantityPerPage={quantityperpage}&code={filterCode}");
+        if (httpResponse.IsSuccessStatusCode)
+        {
+            totalPageQuantity = int.Parse(httpResponse.Headers.GetValues("pagesQuantity").FirstOrDefault());
+            var responseString = await httpResponse.Content.ReadAsStringAsync();
+            stocks = JsonSerializer.Deserialize<List<Stock>>(responseString,
+                new JsonSerializerOptions() { PropertyNameCaseInsensitive = true });
+            StateHasChanged();
+        }
+    }
+
+    private async Task SelectedPage(int page)
+    {
+        currentPage = page;
+        await LoadData(page);
+    }
+
+    public bool IsConnected => hubConnection.State == HubConnectionState.Connected;
+
+    Task SendMessage() => hubConnection.SendAsync("SendMessage");
+
+    private async Task Filter()
+    {
+        currentPage = 1;
+        await LoadData();
+    }
+
+    private async Task Clear()
+    {
+        filterCode = string.Empty;
+        currentPage = 1;
+        await LoadData();
+    }
+    public void Dispose()
+    {
+        _ = hubConnection.DisposeAsync();
+    }
+}

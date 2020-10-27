@@ -1,0 +1,102 @@
+﻿@page "/Location"
+@using NTBIAsset.Shared;
+@using Microsoft.AspNetCore.SignalR.Client;
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IToastService toastService
+<h3>LocationPage</h3>
+<hr />
+<div class="container">
+    <div class="row justify-content-start mb-3">
+        <button @onclick="@(() => ShowModalLocation(0))" class="btn btn-primary btn-sm">New Location</button>
+    </div>
+</div>
+
+@if (Locations == null)
+{
+    <p>Loading..</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Active</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Locations)
+            {
+                <tr>
+                    <td>@item.Name</td>
+                    <td>@item.Active</td>
+                    <td><button @onclick="@(() => ShowModalLocation(item.Id))" class="btn btn-outline-info btn-sm">Edit</button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+@code {
+
+    [CascadingParameter] public IModalService Modal { get; set; }
+
+    private HubConnection hubConnection;
+    List<Location> Locations = new List<Location>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+        .WithUrl(NavigationManager.ToAbsoluteUri("/LocationHub"))
+        .Build();
+
+        hubConnection.On("ReceiveMessage", async () =>
+        {
+            await LoadData();
+            StateHasChanged();
+        });
+
+        await hubConnection.StartAsync();
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        Locations = await Http.GetJsonAsync<List<Location>>("api/Locations");
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        _ = hubConnection.DisposeAsync();
+    }
+
+    async Task ShowModalLocation(int DeptID)
+    {
+        var parameters = new ModalParameters();
+        parameters.Add(nameof(CreateLocationForm.LocationId), DeptID);
+
+        string title = string.Empty;
+        if (DeptID > 0)
+        {
+            title = "Edit Form";
+        }
+        else
+        {
+            title = "Adding Form";
+        }
+
+        var formModal = Modal.Show<CreateLocationForm>(title, parameters);
+
+        var result = await formModal.Result;
+
+
+        if (!result.Cancelled)
+        {
+            toastService.ShowSuccess(result.Data.ToString());
+        }
+
+
+    }
+}

@@ -1,0 +1,51 @@
+﻿@inherits LayoutComponentBase
+@using NTBIAsset.Client.Pages.Account
+    <AuthorizeView>
+        <Authorized>
+            <div class="sidebar">
+                <NavMenu />
+            </div>
+            <div class="main">
+                <div class="top-row px-4">
+                    Welcome, @Username
+                </div>
+
+                <div class="content px-4">
+                    @Body
+                </div>
+            </div>
+        </Authorized>
+        <NotAuthorized>
+            <RedirectLogin />
+        </NotAuthorized>
+        <Authorizing>
+            <p>Authorizing...</p>
+        </Authorizing>
+    </AuthorizeView>
+
+    <MatToastContainer />
+
+<BlazoredToasts Position="Blazored.Toast.Configuration.ToastPosition.TopRight"
+                Timeout="5" />
+
+@code {
+
+    public string Username { get; set; }
+
+    [CascadingParameter]
+    public Task<AuthenticationState> authenticationState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        var Authstate = await authenticationState;
+        var user = Authstate.User;
+
+        if (user.Identity.IsAuthenticated)
+        {
+            var claim = user.FindFirst(x => x.Type == System.Security.Claims.ClaimTypes.Name);
+            Username = claim.Value;
+        }
+    }
+
+}

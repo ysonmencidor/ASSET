@@ -1,0 +1,103 @@
+﻿@page "/Report"
+@using NPOI.SS.UserModel
+@using NPOI.XSSF.UserModel
+@using System.IO
+@using NTBIAsset.Shared
+@using NTBIAsset.Client.Helpers
+@using System.ComponentModel.DataAnnotations;
+@inject IJSRuntime jsruntime
+@inject HttpClient Http
+@attribute [Authorize]
+
+<h3>Report</h3>
+<br />
+
+<div class="card">
+    <EditForm Model="model" OnValidSubmit="@(async()=> { await GenerateExcel(); })">
+        <div class="card-header">
+            <button class="btn btn-primary btn-sm" type="submit">Export</button>
+        </div>
+        <div class="card-body">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+          <div class="form-group">
+                <label for="exampleFormControlSelect1">Example select</label>
+                <select class="form-control" id="exampleFormControlSelect1">
+                    <option>1</option>
+                    <option>2</option>
+                    <option>3</option>
+                    <option>4</option>
+                    <option>5</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="exampleFormControlSelect1">Example select</label>
+                <InputDate class="form-control form-control-sm" @bind-Value="model.dateFrom"></InputDate>
+            </div>
+            <div class="form-group">
+                <label for="exampleFormControlSelect1">Example select</label>
+                <InputDate class="form-control form-control-sm" @bind-Value="model.dateTo"></InputDate>
+            </div>
+        </div>
+    </EditForm>
+</div>
+
+@code {
+
+    InputModel model = new InputModel();
+
+    private class InputModel
+    {
+        [Required(ErrorMessage = "Requried!!!!!!!!!!")]
+        public string Department { get; set; }
+
+        [DataType(DataType.Date)]
+        public DateTime dateFrom { get; set; }
+
+        [DataType(DataType.Date)]
+        public DateTime dateTo { get; set; }
+    }
+
+    List<Stock> stocks = new List<Stock>();
+
+
+    public async Task GenerateExcel()
+    {
+        stocks = await Http.GetJsonAsync<List<Stock>>("api/ToPrintAsync");
+
+
+        IWorkbook workbook = new XSSFWorkbook();
+
+        var dataFormat = workbook.CreateDataFormat();
+        var dataStyle = workbook.CreateCellStyle();
+        dataStyle.DataFormat = dataFormat.GetFormat("MM/dd/yyyy HH:mm:ss");
+
+        ISheet worksheet = workbook.CreateSheet("Sheet1");
+
+        int rowNumber = 0;
+        IRow row = worksheet.CreateRow(rowNumber++);
+        ICell cell = row.CreateCell(0);
+        cell.SetCellValue("Id");
+
+        cell = row.CreateCell(1);
+        cell.SetCellValue("Barcode");
+
+        foreach (var items in stocks)
+        {
+            row = worksheet.CreateRow(rowNumber++);
+            cell = row.CreateCell(0);
+            cell.SetCellValue(items.Id);
+
+            cell = row.CreateCell(1);
+            cell.SetCellValue(items.BarCode);
+        }
+
+        MemoryStream ms = new MemoryStream();
+        workbook.Write(ms);
+        byte[] bytes = ms.ToArray();
+        ms.Close();
+
+        await jsruntime.SaveAsFileAsync("Stocks", bytes, "application/vnd.ms-excel");
+
+    }
+}

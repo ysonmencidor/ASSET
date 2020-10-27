@@ -1,0 +1,63 @@
+﻿@using NTBIAsset.Shared;
+@using Microsoft.AspNetCore.SignalR.Client
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<EditForm Model="userAccount" autocomplete="off" OnValidSubmit="@(async()=> { await SaveAccount(); })">
+    <DataAnnotationsValidator />
+    <div class="form-group">
+        <label for="uName">Username</label>
+        <InputText class="form-control" id="uName" @bind-Value="@userAccount.Username"></InputText>
+        <ValidationMessage For="() => userAccount.Username" />
+    </div>
+    <div class="form-group">
+        <label for="uName">Password</label>
+        <InputText class="form-control" id="uName" @bind-Value="@userAccount.Password"></InputText>
+        <ValidationMessage For="() => userAccount.Password" />
+    </div>
+    <div class="d-flex justify-content-center">
+        <button type="submit" class="btn btn-success btn-sm">Save</button>
+    </div>
+</EditForm>
+
+@code{
+
+    UserAccount userAccount = new UserAccount();
+
+    [Parameter]
+    public int AccountID { get; set; }
+
+    [CascadingParameter] BlazoredModalInstance BlazoredModal { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+
+        if (AccountID > 0)
+        {
+            userAccount = await Http.GetJsonAsync<UserAccount>("api/UserAccounts/" + AccountID);
+        }
+        else
+        {
+            userAccount = new UserAccount();
+        }
+
+    }
+
+
+    private async Task SaveAccount()
+    {
+        if (AccountID > 0)
+        {
+            await Http.PutAsJsonAsync("api/UserAccounts/" + AccountID, userAccount);
+            await BlazoredModal.Close(ModalResult.Ok($"Update User successfully."));
+        }
+        else
+        {
+            await Http.PostAsJsonAsync("api/UserAccounts", userAccount);
+            await BlazoredModal.Close(ModalResult.Ok($"User Created successfully."));
+        }
+
+        //await BlazoredModal.Close(ModalResult.Ok($"Form was submitted successfully."));
+    }
+
+}

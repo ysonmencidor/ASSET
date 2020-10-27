@@ -1,0 +1,71 @@
+﻿@using NTBIAsset.Shared;
+@using Microsoft.AspNetCore.SignalR.Client
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<EditForm Model="location" OnValidSubmit="@(async()=> { await SaveLocation(); })">
+    <DataAnnotationsValidator/>
+    <ValidationSummary/>
+    <div class="form-group">
+        <label for="dept">Department</label>
+        <InputText class="form-control" id="dept" @bind-Value="@location.Name" placeholder="Department Name"></InputText>
+        <ValidationMessage For="() => location.Name" />
+    </div>
+    <div class="d-flex justify-content-center">
+        <button type="submit" class="btn btn-success btn-sm">Save</button>
+    </div>
+</EditForm>
+
+
+@code{
+
+    Location location = new Location();
+
+    [Parameter]
+    public int LocationId { get; set; }
+
+    private HubConnection hubConnection;
+
+    [CascadingParameter] BlazoredModalInstance BlazoredModal { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+           .WithUrl(NavigationManager.ToAbsoluteUri("/LocationHub"))
+           .Build();
+
+        await hubConnection.StartAsync();
+
+        if (LocationId > 0)
+        {
+            location = await Http.GetJsonAsync<Location>("api/Locations/" + LocationId);
+        }
+        else
+        {
+            location = new Location();
+        }
+    }
+
+    public bool IsConnected => hubConnection.State == HubConnectionState.Connected;
+
+    private async Task SaveLocation()
+    {
+        if (LocationId > 0)
+        {
+            await Http.PutAsJsonAsync("api/Locations/" + LocationId, location);
+            await BlazoredModal.Close(ModalResult.Ok($"Record update successfully."));
+        }
+        else
+        {
+            await Http.PostAsJsonAsync("api/Locations", location);
+            await BlazoredModal.Close(ModalResult.Ok($"Added new item successfully."));
+            // await BlazoredModal.Close(ModalResult.Ok<Location>(location));
+        }
+
+        if (IsConnected) await SendMessage();
+
+        //await BlazoredModal.Close(ModalResult.Ok($"Form was submitted successfully."));
+    }
+
+    Task SendMessage() => hubConnection.SendAsync("SendMessage");
+}

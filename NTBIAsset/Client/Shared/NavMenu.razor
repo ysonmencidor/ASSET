@@ -1,0 +1,67 @@
+﻿@inject HttpClient httpClient
+@inject NavigationManager navigationManager
+@inject AuthenticationStateProvider authProvider
+
+<div class="top-row pl-4 navbar navbar-dark">
+    <a class="navbar-brand" href="">NTBIAsset</a>
+    <button class="navbar-toggler" @onclick="ToggleNavMenu">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+</div>
+
+<div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
+    <ul class="nav flex-column">
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="oi oi-dashboard"></span> Dashboard
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="inventory">
+                <span class="oi oi-box" aria-hidden="true"></span> Inventory
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="location">
+                <span class="oi oi-map" aria-hidden="true"></span> Locations
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="report">
+                <span class="oi oi-print" aria-hidden="true"></span> Report
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="users">
+                <span class="oi oi-lock-locked" aria-hidden="true"></span> Account
+            </NavLink>
+        </li>
+
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="Login" @onclick="LogOut">
+                <span class="oi oi-account-logout" aria-hidden="true"></span> Log Out
+            </NavLink>
+        </li>
+
+    </ul>
+</div>
+
+@code {
+
+    private bool collapseNavMenu = true;
+
+    private string NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+
+    async Task LogOut()
+    {
+        await httpClient.GetAsync("api/UserAccounts/logoutuser");
+        navigationManager.NavigateTo("Login", true);
+    }
+
+
+}
